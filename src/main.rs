@@ -44,11 +44,11 @@ impl Cell {
         let mut color = GRAY;
 
         if self.visited {
-            color = PURPLE;
+            color = LIME;
         }
 
         if self.current {
-            color = DARKPURPLE;
+            color = BLACK;
         }
 
         draw_rectangle(self.rect.x, self.rect.y, self.rect.w, self.rect.h, color);
@@ -126,7 +126,8 @@ struct Grid{
     current: usize,
     next: Option<Neighbour>,
     cols: usize,
-    rows: usize
+    rows: usize,
+    stack: Vec<usize>
 }
 
 impl Grid {
@@ -148,11 +149,12 @@ impl Grid {
             }
         }
 
-        Self { cells, current: 0, next: None, cols, rows }
+        Self { cells, current: 0, next: None, cols, rows, stack: Vec::new() }
     }
 
     pub fn setup(&mut self) {
-        self.cells[self.current].current = false;
+        self.cells[self.current].current = true;
+        self.cells[self.current].visited = true;
     }
 
     pub fn update(&mut self) {
@@ -160,17 +162,30 @@ impl Grid {
 
         match &self.next {
             Some(neighbour) => {
-                self.cells[self.current].visited = true;
                 self.cells[self.current].current = false;
-                self.cells[self.current].remove_wall(&neighbour.side, false);
 
                 self.cells[neighbour.index].current = true;
+                self.cells[neighbour.index].visited = true;
+
+                self.cells[self.current].remove_wall(&neighbour.side, false);
                 self.cells[neighbour.index].remove_wall(&neighbour.side, true);
+
+                self.stack.push(self.current);
 
                 self.current = neighbour.index;
                 self.next = None;
             },
-            None => {}
+            None => {
+                if self.stack.is_empty() {
+                    return;
+                }
+
+                self.cells[self.current].current = false;
+                
+                self.current = self.stack.pop().unwrap();
+
+                self.cells[self.current].current = true;
+            }
         }
     }
 
@@ -221,7 +236,7 @@ impl Grid {
             None => {}
         }
 
-        neighbours.retain(|neighbour| !self.cells[neighbour.index].visited );
+        neighbours.retain(|neighbour| !self.cells[neighbour.index].visited);
 
         if neighbours.len() > 0 {
             let random_num = rand::gen_range(0, neighbours.len());
@@ -244,7 +259,7 @@ impl Grid {
 async fn main() {
     rand::srand(chrono::offset::Local::now().timestamp() as u64);
 
-    let scale = 20f32;
+    let scale = 10f32;
     let margin = 20f32;
     
     let mut grid = Grid::new(scale, margin);
