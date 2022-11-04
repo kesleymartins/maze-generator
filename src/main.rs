@@ -20,6 +20,26 @@ impl Cell {
         }
     }
 
+    pub fn remove_wall(&mut self, side: &Side, inverse: bool) {
+        if inverse {
+            match side {
+                Side::BOTTOM => self.walls.0 = false,
+                Side::LEFT => self.walls.1 = false,
+                Side::TOP => self.walls.2 = false,
+                Side::RIGHT => self.walls.3 = false,
+            }
+
+            return;
+        }
+        
+        match side {
+            Side::TOP => self.walls.0 = false,
+            Side::RIGHT => self.walls.1 = false,
+            Side::BOTTOM => self.walls.2 = false,
+            Side::LEFT => self.walls.3 = false,
+        }
+    }
+
     pub fn draw(&self) {
         let mut color = GRAY;
 
@@ -83,12 +103,28 @@ impl Cell {
     }
 }
 
+enum Side {
+    TOP,
+    RIGHT,
+    BOTTOM,
+    LEFT
+}
 
+struct Neighbour {
+    index: usize,
+    side: Side, 
+}
+
+impl Neighbour {
+    pub fn new(index: usize, side: Side) -> Self {
+        Self { index, side }
+    }
+}
 
 struct Grid{
     cells: Vec<Cell>,
     current: usize,
-    next: Option<usize>,
+    next: Option<Neighbour>,
     cols: usize,
     rows: usize
 }
@@ -122,17 +158,19 @@ impl Grid {
     pub fn update(&mut self) {
         self.setup_next();
 
-        match self.next {
-            Some(next) => {
+        match &self.next {
+            Some(neighbour) => {
                 self.cells[self.current].visited = true;
                 self.cells[self.current].current = false;
+                self.cells[self.current].remove_wall(&neighbour.side, false);
 
-                self.cells[next].current = true;
+                self.cells[neighbour.index].current = true;
+                self.cells[neighbour.index].remove_wall(&neighbour.side, true);
 
-                self.current = next;
+                self.current = neighbour.index;
                 self.next = None;
             },
-            None => println!("Sem Proximo")
+            None => {}
         }
     }
 
@@ -149,37 +187,48 @@ impl Grid {
 
         if coord.0 > 0 {
             match self.neighbour_index(coord.1, coord.0-1) {
-                Some(index) => neighbours.push(index),
-                None => println!("no TOP")
+                Some(index) => {
+                    let neighbour = Neighbour::new(index, Side::TOP);
+                    neighbours.push(neighbour)
+                },
+                None => {}
             }
         }
 
         if coord.1 > 0 {
             match self.neighbour_index(coord.1-1, coord.0) {
-                Some(index) => neighbours.push(index),
-                None => println!("no LEFT")
+                Some(index) => {
+                        let neighbour = Neighbour::new(index, Side::LEFT);
+                    neighbours.push(neighbour)
+                },
+                None => {}
             }
         }
 
         match self.neighbour_index(coord.1+1, coord.0) {
-            Some(index) => neighbours.push(index),
-            None => println!("no RIGHT")
+            Some(index) => {
+                    let neighbour = Neighbour::new(index, Side::RIGHT);
+                    neighbours.push(neighbour)
+            },
+            None => {}
         }
 
         match self.neighbour_index(coord.1, coord.0+1) {
-            Some(index) => neighbours.push(index),
-            None => println!("no BOTTOM")
+            Some(index) => {
+                    let neighbour = Neighbour::new(index, Side::BOTTOM);
+                    neighbours.push(neighbour)
+            },
+            None => {}
         }
 
-        neighbours.retain(|index| !self.cells[*index].visited);
+        neighbours.retain(|neighbour| !self.cells[neighbour.index].visited );
 
         if neighbours.len() > 0 {
             let random_num = rand::gen_range(0, neighbours.len());
-            self.next = Some(neighbours[random_num]);
+            
+            self.next = Some(neighbours.remove(random_num));
             return;
         }
-
-        self.next = None;
     }
 
     fn neighbour_index(&self, i: usize, j: usize) -> Option<usize> {
